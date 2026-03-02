@@ -11,6 +11,14 @@ namespace AssetManagement.Models.Entities
         [Key]
         public int AssetID { get; set; }
 
+        public string ModelNo { get; set; }
+
+        public string Description { get; set; }
+
+        public string DepartmentName {  get; set; }
+
+        public string SupplierName { get; set; }
+
         [Required]
         public string Name { get; set; } = null!;
 
@@ -28,8 +36,6 @@ namespace AssetManagement.Models.Entities
 
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public AssetStatus Status { get; set; }
-
-     
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
     }

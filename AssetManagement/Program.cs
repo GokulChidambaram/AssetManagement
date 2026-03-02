@@ -1,4 +1,5 @@
 using AssetManagement.Data;
+using AssetManagement.Middleware;
 using AssetManagement.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -38,6 +39,16 @@ builder.Services.AddSwaggerGen(c =>
            Array.Empty<string>()
        }
    });
+});
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngularApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
 });
 
 // DbContext registration - update connection string in appsettings.json before running
@@ -86,9 +97,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseCors("AllowAngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<AuditMiddleware>();
+
 
 app.MapControllers();
 

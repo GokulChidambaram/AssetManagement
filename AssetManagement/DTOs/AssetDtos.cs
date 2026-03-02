@@ -6,7 +6,13 @@ namespace AssetManagement.DTOs
 
 {
 
-    public record AssetCreateDto(string Name, int CategoryID, string? Tag, DateTime? PurchaseDate, decimal? Cost);
+    public record AssetCreateDto(
+        string Name,
+        string Description,
+        string ModelNo,
+        string DepartmentName,
+        string SupplierName,
+        int CategoryID, string? Tag, DateTime? PurchaseDate, decimal? Cost);
 
     public record AssetUpdateDto(string Name, int CategoryID, string? Tag, DateTime? PurchaseDate, decimal? Cost, AssetStatus Status);
 

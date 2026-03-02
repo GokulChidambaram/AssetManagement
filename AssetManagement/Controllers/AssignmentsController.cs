@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace AssetManagement.Controllers
 {
+
     [ApiController]
     [Route("api/[controller]")]
     public class AssignmentsController : ControllerBase
@@ -17,6 +18,7 @@ namespace AssetManagement.Controllers
             _spService = spService;
             _db = db;
         }
+        [HttpGet]
         public async  Task<IActionResult> GetAll()
         {
             var a = await _db.Assignments
@@ -54,15 +56,14 @@ namespace AssetManagement.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, AssignmentResponseDto dto)
+        public async Task<IActionResult> Update(int id, UpdateAssignmentDto dto)
         {
             var a = await _db.Set<AssetManagement.Models.Entities.Assignment>().FindAsync(id);
             if (a == null) return NotFound();
 
-            a.ReturnDate = dto.ReturnDate;
             a.Status = dto.Status;
             a.Location = dto.Location;
-            a.UpdatedAt = DateTime.UtcNow;
+            
             await _db.SaveChangesAsync();
             return NoContent();
         }

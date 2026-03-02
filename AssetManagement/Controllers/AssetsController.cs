@@ -76,6 +76,10 @@ namespace AssetManage.Controllers
 
                 Name = dto.Name,
                 CategoryID = dto.CategoryID,
+                Description = dto.Description,
+                ModelNo = dto.ModelNo,
+                DepartmentName = dto.DepartmentName,
+                SupplierName = dto.SupplierName,
                 Tag = dto.Tag,
                 PurchaseDate = dto.PurchaseDate,
                 Cost = dto.Cost,

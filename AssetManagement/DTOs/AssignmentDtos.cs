@@ -19,4 +19,6 @@ namespace AssetManagement.DTOs
         DateTime? ReturnDate, 
         AssignmentStatus Status, 
         string? Location);
+
+    public record UpdateAssignmentDto(AssignmentStatus Status, string? Location);
 }
