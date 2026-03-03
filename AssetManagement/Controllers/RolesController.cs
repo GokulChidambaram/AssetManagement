@@ -8,7 +8,7 @@ namespace AssetManagement.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+    //[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
     public class RolesController : ControllerBase
     {
         private readonly ApplicationDbContext _db;

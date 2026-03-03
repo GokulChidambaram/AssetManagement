@@ -14,15 +14,23 @@ namespace AssetManagement.DTOs
         string SupplierName,
         int CategoryID, string? Tag, DateTime? PurchaseDate, decimal? Cost);
 
-    public record AssetUpdateDto(string Name, int CategoryID, string? Tag, DateTime? PurchaseDate, decimal? Cost, AssetStatus Status);
-
-    public record AssetResponseDto(int AssetID, 
+	//public record AssetUpdateDto(string Name, int CategoryID, string? Tag, DateTime? PurchaseDate, decimal? Cost, AssetStatus Status);
+	public record AssetUpdateDto(
+		string Name,
+		string CategoryName, // Changed from CategoryID to CategoryName
+		string ModelNo,      // Added ModelNo
+		string? Tag,
+		DateTime? PurchaseDate,
+		decimal? Cost,
+		AssetStatus Status);
+	public record AssetResponseDto(int AssetID, 
         string Name, 
-        int CategoryID, 
+        int CategoryID,
         string CategoryName, 
         string? Tag, 
-        DateTime? PurchaseDate, 
-        decimal? Cost,
+        DateTime? PurchaseDate,
+		string ModelNo,
+		decimal? Cost,
         [property : JsonConverter(typeof(JsonStringEnumConverter))]
         AssetStatus Status, 
         DateTime CreatedAt, 

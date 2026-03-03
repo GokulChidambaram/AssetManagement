@@ -10,13 +10,15 @@ namespace AssetManage.Controllers
     [Route("api/[controller]")]
     public class AssetsController : ControllerBase
     {
+
         private readonly ApplicationDbContext _db;
         public AssetsController(ApplicationDbContext db)
         {
             _db = db;
         }
-        //[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,Manager,Employee")]
-        [HttpGet]
+		private string GetCurrentUserName() => User.Identity?.Name ?? "System";
+		//[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,Manager,Employee")]
+		[HttpGet]
         [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetAll()
         {
@@ -29,6 +31,7 @@ namespace AssetManage.Controllers
                     a.Category!.Name,
                     a.Tag,
                     a.PurchaseDate,
+                    a.ModelNo,
                     a.Cost,
                     a.Status,
                     a.CreatedAt,
@@ -53,6 +56,7 @@ namespace AssetManage.Controllers
                     a.Category!.Name,
                     a.Tag,
                     a.PurchaseDate,
+                    a.ModelNo,
                     a.Cost,
                     a.Status,
                     a.CreatedAt,
@@ -84,8 +88,10 @@ namespace AssetManage.Controllers
                 PurchaseDate = dto.PurchaseDate,
                 Cost = dto.Cost,
                 Status = AssetManagement.Models.Enums.AssetStatus.Available,
-                CreatedAt = DateTime.UtcNow
-            };
+                CreatedAt = DateTime.UtcNow,
+
+				
+			};
 
             _db.Set<Asset>().Add(asset);
             await _db.SaveChangesAsync();
@@ -93,27 +99,37 @@ namespace AssetManage.Controllers
 
         }
 
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+		[HttpPut("{id}")]
+		[Authorize(Roles = "Admin")]
+		public async Task<IActionResult> Update(int id, [FromBody] AssetUpdateDto dto) // Added [FromBody]
+		{
+			var asset = await _db.Assets.FindAsync(id);
+			if (asset == null) return NotFound();
 
-        public async Task<IActionResult> Update(int id, AssetUpdateDto dto)
-        {
+			// Look up Category by Name
+			var category = await _db.Categories
+				.FirstOrDefaultAsync(c => c.Name == dto.CategoryName);
 
-            var asset = await _db.Set<Asset>().FindAsync(id);
-            if (asset == null) return NotFound();
-            asset.Name = dto.Name;
-            asset.CategoryID = dto.CategoryID;
-            asset.Tag = dto.Tag;
-            asset.PurchaseDate = dto.PurchaseDate;
-            asset.Cost = dto.Cost;
-            asset.Status = dto.Status;
-            asset.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-            return NoContent();
+			if (category == null)
+			{
+				return BadRequest(new { message = $"Category '{dto.CategoryName}' does not exist." });
+			}
 
-        }
+			// Update properties
+			asset.Name = dto.Name;
+			asset.ModelNo = dto.ModelNo;
+			asset.CategoryID = category.CategoryID;
+			asset.Tag = dto.Tag;
+			asset.PurchaseDate = dto.PurchaseDate;
+			asset.Cost = dto.Cost;
+			asset.Status = dto.Status;
+			asset.UpdatedAt = DateTime.UtcNow;
 
-        [HttpDelete("{id}")]
+			await _db.SaveChangesAsync();
+			return NoContent();
+		}
+
+		[HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
