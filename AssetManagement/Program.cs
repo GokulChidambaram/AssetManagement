@@ -7,7 +7,12 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+	.AddJsonOptions(options =>
+	{
+		// This tells .NET to convert strings like "Available" into your C# Enum
+		options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+	});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -86,8 +91,10 @@ builder.Services.AddAuthentication(options =>
     });
 
 builder.Services.AddAuthorization();
-
+builder.Services.AddHttpContextAccessor();
 var app = builder.Build();
+
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

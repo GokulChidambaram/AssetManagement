@@ -2,16 +2,21 @@ using AssetManagement.Models.Entities;
 using AssetManagement.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using AssetManagement.Services;
 
 namespace AssetManagement.Data
 {
     public class ApplicationDbContext : DbContext
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-        {
-        }
+		private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public DbSet<User> Users => Set<User>();
+		public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IHttpContextAccessor httpContextAccessor)
+			: base(options)
+		{
+			_httpContextAccessor = httpContextAccessor;
+		}
+
+		public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Asset> Assets => Set<Asset>();
@@ -22,7 +27,32 @@ namespace AssetManagement.Data
 
         public DbSet<AuditLog> AuditLogs { get; set; }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+		public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+		{
+			// Get current user's name from the Name Claim we set earlier
+			var userName = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "System";
+
+			var entries = ChangeTracker.Entries<IAuditable>();
+
+			foreach (var entry in entries)
+			{
+				if (entry.State == EntityState.Added)
+				{
+					entry.Entity.CreatedAt = DateTime.UtcNow;
+					entry.Entity.CreatedBy = userName;
+				}
+
+				if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
+				{
+					entry.Entity.UpdatedAt = DateTime.UtcNow;
+					entry.Entity.UpdatedBy = userName;
+				}
+			}
+
+			return await base.SaveChangesAsync(cancellationToken);
+		}
+
+		protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 

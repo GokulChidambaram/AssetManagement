@@ -72,6 +72,7 @@ namespace AssetManagement.Controllers
                 new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, user.Name),
                 new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Email, user.Email),
                 new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, roleName)
+
             };
 
             var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(issuer,
