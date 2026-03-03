@@ -26,18 +26,60 @@ namespace AssetManagement.Controllers
                 .ToListAsync();
             return Ok(list);
         }
+		[HttpGet("{id}")]
+		public async Task<IActionResult> GetById(int id)
+		{
+			// Find the category by ID and ensure it isn't soft-deleted
+			var category = await _db.Set<Category>().FirstOrDefaultAsync(x => x.CategoryID == id && !x.IsDeleted);
 
-        [HttpPost]
-        public async Task<IActionResult> Create(CategoryCreateDto dto)
-        {
-            var c = new Category { Name = dto.Name, CreatedAt = DateTime.UtcNow };
-            _db.Set<Category>().Add(c);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetAll), new { id = c.CategoryID }, c);
-        }
+			if (category == null)
+			{
+				return NotFound("Category not found in database.");
+			}
 
-        
-        [HttpPut("{id}")]
+			return Ok(category);
+		}
+
+		//[HttpPost]
+		//public async Task<IActionResult> Create(CategoryCreateDto dto)
+		//{
+		//    var c = new Category { Name = dto.Name, CreatedAt = DateTime.UtcNow };
+		//    _db.Set<Category>().Add(c);
+		//    await _db.SaveChangesAsync();
+		//    return CreatedAtAction(nameof(GetAll), new { id = c.CategoryID }, c);
+		//}
+		[HttpPost]
+		public async Task<IActionResult> Create(CategoryCreateDto dto)
+		{
+			try
+			{
+				var exists = await _db.Set<Category>().AnyAsync(x => x.Name.ToLower() == dto.Name.ToLower() && !x.IsDeleted);
+				if (exists) return BadRequest("This category already exists.");
+
+				var category = new Category
+				{
+					Name = dto.Name,
+					CreatedAt = DateTime.UtcNow,
+					IsDeleted = false,
+					// FIX: You MUST provide these because your Model requires them
+					CreatedBy = "Admin",
+					UpdatedBy = "Admin",
+					UpdatedAt = DateTime.UtcNow
+				};
+
+				_db.Set<Category>().Add(category);
+				await _db.SaveChangesAsync();
+
+				return Ok(category);
+			}
+			catch (Exception ex)
+			{
+				// This will now show the REAL error instead of [object Object]
+				return StatusCode(500, ex.InnerException?.Message ?? ex.Message);
+			}
+		}
+
+		[HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, CategoryUpdateDto dto)
         {
             var c = await _db.Set<Category>().FindAsync(id);
