@@ -56,6 +56,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+
+
 // DbContext registration - update connection string in appsettings.json before running
 builder.Services.AddDbContext<AssetManagement.Data.ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Server=(localdb)\\MSSQLLocalDB;Database=AssetManageDbFinal;Trusted_Connection=True;"));
@@ -91,7 +93,7 @@ builder.Services.AddAuthentication(options =>
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddHttpContextAccessor();
+
 var app = builder.Build();
 
 

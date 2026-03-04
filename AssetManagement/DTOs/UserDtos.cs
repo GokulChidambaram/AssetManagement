@@ -19,7 +19,13 @@ namespace AssetManagement.DTOs
         String RoleName,
         string? Department,
         [property :JsonConverter(typeof(JsonStringEnumConverter))]
-        UserStatus Status);
+        UserStatus Status,
+        DateTime CreatedAt,
+        DateTime? UpdatedAt,
+        string CreatedBy,
+        string UpdatedBy
+
+	  );
 
     public record UserRegisterDto(
         string Name, 

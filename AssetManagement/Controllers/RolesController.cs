@@ -3,63 +3,88 @@ using AssetManagement.DTOs;
 using AssetManagement.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AssetManagement.Controllers
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    //[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
-    public class RolesController : ControllerBase
-    {
-        private readonly ApplicationDbContext _db;
+	[ApiController]
+	[Route("api/[controller]")]
+	[Authorize(Roles = "Admin")] // Uncommented for security
+	public class RolesController : ControllerBase
+	{
+		private readonly ApplicationDbContext _db;
 
-        public RolesController(ApplicationDbContext db)
-        {
-            _db = db;
-        }
+		public RolesController(ApplicationDbContext db)
+		{
+			_db = db;
+		}
 
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
-        {
-            var roles = await _db.Roles
-               .Where(r => !r.IsDeleted)
-               .ToListAsync();
-            return Ok(roles);
-        }
+		// Helper to extract the logged-in admin's name from JWT claims
+		private string GetCurrentUserName() => User.Identity?.Name ?? "System";
 
-        [HttpPost]
-        public async Task<IActionResult> Create(RoleCreateDto dto)
-        {
-            var role = new Role { Name = dto.Name, CreatedAt = DateTime.UtcNow };
-            _db.Set<Role>().Add(role);
-            await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetAll), new { id = role.RoleID }, role);
-        }
+		[HttpGet]
+		public async Task<IActionResult> GetAll()
+		{
+			var roles = await _db.Roles
+			   .Where(r => !r.IsDeleted)
+			   .ToListAsync();
+			return Ok(roles);
+		}
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, RoleUpdateDto dto)
-        {
-            var role = await _db.Set<Role>().FindAsync(id);
-            if (role == null) return NotFound();
+		[HttpPost]
+		public async Task<IActionResult> Create(RoleCreateDto dto)
+		{
+			var currentUser = GetCurrentUserName();
 
-            role.Name = dto.Name;
-            role.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-            return NoContent();
-        }
+			var role = new Role
+			{
+				Name = dto.Name,
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            var role = await _db.Set<Role>().FindAsync(id);
-            if (role == null) return NotFound();
+				// --- Manual Audit Fields ---
+				CreatedAt = DateTime.UtcNow,
+				UpdatedAt = DateTime.UtcNow,
+				CreatedBy = currentUser,
+				UpdatedBy = currentUser
+			};
 
-            // soft-delete by setting UpdatedAt (roles may not have a Status in model)
+			_db.Set<Role>().Add(role);
+			await _db.SaveChangesAsync();
 
-            role.IsDeleted = true;
-            role.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-            return NoContent();
-        }
-    }
+			// Note: CreatedAtAction usually points to a 'GetById' method if you have one
+			return CreatedAtAction(nameof(GetAll), new { id = role.RoleID }, role);
+		}
+
+		[HttpPut("{id}")]
+		public async Task<IActionResult> Update(int id, RoleUpdateDto dto)
+		{
+			var role = await _db.Set<Role>().FindAsync(id);
+			if (role == null) return NotFound();
+
+			role.Name = dto.Name;
+
+			// --- Manual Audit Fields ---
+			role.UpdatedAt = DateTime.UtcNow;
+			role.UpdatedBy = GetCurrentUserName();
+
+			await _db.SaveChangesAsync();
+			return NoContent();
+		}
+
+		[HttpDelete("{id}")]
+		public async Task<IActionResult> Delete(int id)
+		{
+			var role = await _db.Set<Role>().FindAsync(id);
+			if (role == null) return NotFound();
+
+			// Soft-delete logic
+			role.IsDeleted = true;
+
+			// --- Manual Audit Fields ---
+			role.UpdatedAt = DateTime.UtcNow;
+			role.UpdatedBy = GetCurrentUserName();
+
+			await _db.SaveChangesAsync();
+			return NoContent();
+		}
+	}
 }

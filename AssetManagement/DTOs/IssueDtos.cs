@@ -20,5 +20,11 @@ namespace AssetManagement.DTOs
         string? Description, 
         DateTime ReportedDate,
         [property : JsonConverter(typeof(JsonStringEnumConverter))]
-        IssueStatus Status);
+        IssueStatus Status,
+        DateTime CreatedAt,
+        DateTime? UpdatedAt,
+        string CreatedBy,
+        string UpdatedBy
+
+		);
 }
