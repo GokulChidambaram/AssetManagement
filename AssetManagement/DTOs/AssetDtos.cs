@@ -34,7 +34,11 @@ namespace AssetManagement.DTOs
         [property : JsonConverter(typeof(JsonStringEnumConverter))]
         AssetStatus Status, 
         DateTime CreatedAt, 
-        DateTime? UpdatedAt);
+        DateTime? UpdatedAt,
+        string CreatedBy, // New Field 
+        string UpdatedBy  // New Field
+
+		);
 
 }
 
