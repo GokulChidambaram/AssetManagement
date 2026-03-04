@@ -13,13 +13,8 @@ namespace AssetManage.Controllers
     public class AssetsController : ControllerBase
     {
         private readonly ApplicationDbContext _db;
+        public AssetsController(ApplicationDbContext db) => _db = db;
 
-        public AssetsController(ApplicationDbContext db)
-        {
-            _db = db;
-        }
-
-        // Helper to extract the user.Name from the JWT claims
         private string GetCurrentUserName() => User.Identity?.Name ?? "System";
 
         [HttpGet]
@@ -71,17 +66,14 @@ namespace AssetManage.Controllers
                     a.UpdatedBy
                 )).FirstOrDefaultAsync();
 
-            if (asset == null)
-                return NotFound();
-
-            return Ok(asset);
+            return asset == null ? NotFound() : Ok(asset);
         }
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(AssetCreateDto dto)
         {
-            var currentUserName = GetCurrentUserName();
+            var currentUser = GetCurrentUserName();
 
             var asset = new Asset
             {
@@ -97,8 +89,8 @@ namespace AssetManage.Controllers
                 Status = AssetManagement.Models.Enums.AssetStatus.Available,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                CreatedBy = currentUserName,
-                UpdatedBy = currentUserName
+                CreatedBy = currentUser,
+                UpdatedBy = currentUser
             };
 
             _db.Assets.Add(asset);
@@ -114,13 +106,9 @@ namespace AssetManage.Controllers
             var asset = await _db.Assets.FindAsync(id);
             if (asset == null) return NotFound();
 
-            var category = await _db.Categories
-                .FirstOrDefaultAsync(c => c.Name == dto.CategoryName);
-
+            var category = await _db.Categories.FirstOrDefaultAsync(c => c.Name == dto.CategoryName);
             if (category == null)
-            {
                 return BadRequest(new { message = $"Category '{dto.CategoryName}' does not exist." });
-            }
 
             asset.Name = dto.Name;
             asset.ModelNo = dto.ModelNo;
@@ -129,8 +117,6 @@ namespace AssetManage.Controllers
             asset.PurchaseDate = dto.PurchaseDate;
             asset.Cost = dto.Cost;
             asset.Status = dto.Status;
-
-            // Audit update
             asset.UpdatedAt = DateTime.UtcNow;
             asset.UpdatedBy = GetCurrentUserName();
 
@@ -145,10 +131,7 @@ namespace AssetManage.Controllers
             var asset = await _db.Assets.FindAsync(id);
             if (asset == null) return NotFound();
 
-            // Perform Soft Delete
             asset.Status = AssetManagement.Models.Enums.AssetStatus.Deleted;
-            
-            // Log who deleted it
             asset.UpdatedAt = DateTime.UtcNow;
             asset.UpdatedBy = GetCurrentUserName();
 
@@ -157,11 +140,12 @@ namespace AssetManage.Controllers
         }
 
         [HttpGet("report")]
-        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetReport(DateTime startDate, DateTime endDate)
         {
+            var finalEnd = endDate.Date.AddDays(1).AddTicks(-1);
+
             var report = await _db.Assets
-                .Where(a => a.CreatedAt >= startDate && a.CreatedAt <= endDate)
+                .Where(a => a.CreatedAt >= startDate.Date && a.CreatedAt <= finalEnd)
                 .ToListAsync();
 
             return Ok(report);
