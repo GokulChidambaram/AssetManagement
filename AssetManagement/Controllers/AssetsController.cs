@@ -143,6 +143,16 @@ namespace AssetManage.Controllers
 
         }
 
+        [HttpGet("report")]
+        public async Task<IActionResult> GetReport(DateTime startDate, DateTime endDate)
+        {
+            var report = await _db.Assets
+                .Where(a => a.CreatedAt >= startDate && a.CreatedAt <= endDate)
+                .ToListAsync();
+
+            return Ok(report);
+        }
+
     }
 
 }
