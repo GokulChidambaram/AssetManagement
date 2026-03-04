@@ -8,146 +8,156 @@ using System.Security.Claims;
 
 namespace AssetManage.Controllers
 {
-	[ApiController]
-	[Route("api/[controller]")]
-	public class AssetsController : ControllerBase
-	{
-		private readonly ApplicationDbContext _db;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AssetsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _db;
 
-		public AssetsController(ApplicationDbContext db)
-		{
-			_db = db;
-		}
+        public AssetsController(ApplicationDbContext db)
+        {
+            _db = db;
+        }
 
-		// Helper to extract the user.Name from the JWT claims
-		private string GetCurrentUserName() => User.Identity?.Name ?? "System";
+        // Helper to extract the user.Name from the JWT claims
+        private string GetCurrentUserName() => User.Identity?.Name ?? "System";
 
-		[HttpGet]
-		[Authorize(Roles = "Admin,Manager")]
-		public async Task<IActionResult> GetAll()
-		{
-			var assets = await _db.Assets
-				.Include(a => a.Category)
-				.Where(a => a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
-				.Select(a => new AssetResponseDto(
-					a.AssetID,
-					a.Name,
-					a.CategoryID,
-					a.Category!.Name,
-					a.Tag,
-					a.PurchaseDate,
-					a.ModelNo,
-					a.Cost,
-					a.Status,
-					a.CreatedAt,
-					a.UpdatedAt,
-					a.CreatedBy, // New Field
-					a.UpdatedBy  // New Field
-				)).ToListAsync();
+        [HttpGet]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> GetAll()
+        {
+            var assets = await _db.Assets
+                .Include(a => a.Category)
+                .Where(a => a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
+                .Select(a => new AssetResponseDto(
+                    a.AssetID,
+                    a.Name,
+                    a.CategoryID,
+                    a.Category!.Name,
+                    a.Tag,
+                    a.PurchaseDate,
+                    a.ModelNo,
+                    a.Cost,
+                    a.Status,
+                    a.CreatedAt,
+                    a.UpdatedAt,
+                    a.CreatedBy,
+                    a.UpdatedBy
+                )).ToListAsync();
 
-			return Ok(assets);
-		}
+            return Ok(assets);
+        }
 
-		[HttpGet("{id}")]
-		[Authorize(Roles = "Admin,Manager,Employee")]
-		public async Task<IActionResult> Get(int id)
-		{
-			var asset = await _db.Assets
-				.Include(a => a.Category)
-				.Where(a => a.AssetID == id && a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
-				.Select(a => new AssetResponseDto(
-					a.AssetID,
-					a.Name,
-					a.CategoryID,
-					a.Category!.Name,
-					a.Tag,
-					a.PurchaseDate,
-					a.ModelNo,
-					a.Cost,
-					a.Status,
-					a.CreatedAt,
-					a.UpdatedAt,
-					a.CreatedBy,
-					a.UpdatedBy
-				)).FirstOrDefaultAsync();
+        [HttpGet("{id}")]
+        [Authorize(Roles = "Admin,Manager,Employee")]
+        public async Task<IActionResult> Get(int id)
+        {
+            var asset = await _db.Assets
+                .Include(a => a.Category)
+                .Where(a => a.AssetID == id && a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
+                .Select(a => new AssetResponseDto(
+                    a.AssetID,
+                    a.Name,
+                    a.CategoryID,
+                    a.Category!.Name,
+                    a.Tag,
+                    a.PurchaseDate,
+                    a.ModelNo,
+                    a.Cost,
+                    a.Status,
+                    a.CreatedAt,
+                    a.UpdatedAt,
+                    a.CreatedBy,
+                    a.UpdatedBy
+                )).FirstOrDefaultAsync();
 
-			if (asset == null)
-				return NotFound();
+            if (asset == null)
+                return NotFound();
 
-			return Ok(asset);
-		}
+            return Ok(asset);
+        }
 
-		[HttpPost]
-		[Authorize(Roles = "Admin")]
-		public async Task<IActionResult> Create(AssetCreateDto dto)
-		{
-			var currentUserName = GetCurrentUserName();
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create(AssetCreateDto dto)
+        {
+            var currentUserName = GetCurrentUserName();
 
-			var asset = new Asset
-			{
-				Name = dto.Name,
-				CategoryID = dto.CategoryID,
-				Description = dto.Description,
-				ModelNo = dto.ModelNo,
-				DepartmentName = dto.DepartmentName,
-				SupplierName = dto.SupplierName,
-				Tag = dto.Tag,
-				PurchaseDate = dto.PurchaseDate,
-				Cost = dto.Cost,
-				Status = AssetManagement.Models.Enums.AssetStatus.Available,
-				CreatedAt = DateTime.UtcNow,
-				UpdatedAt = DateTime.UtcNow,
-				CreatedBy = currentUserName, // Recorded from claims
-				UpdatedBy = currentUserName
-			};
+            var asset = new Asset
+            {
+                Name = dto.Name,
+                CategoryID = dto.CategoryID,
+                Description = dto.Description,
+                ModelNo = dto.ModelNo,
+                DepartmentName = dto.DepartmentName,
+                SupplierName = dto.SupplierName,
+                Tag = dto.Tag,
+                PurchaseDate = dto.PurchaseDate,
+                Cost = dto.Cost,
+                Status = AssetManagement.Models.Enums.AssetStatus.Available,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                CreatedBy = currentUserName,
+                UpdatedBy = currentUserName
+            };
 
-			_db.Assets.Add(asset);
-			await _db.SaveChangesAsync();
+            _db.Assets.Add(asset);
+            await _db.SaveChangesAsync();
 
-			return CreatedAtAction(nameof(Get), new { id = asset.AssetID }, asset);
-		}
+            return CreatedAtAction(nameof(Get), new { id = asset.AssetID }, asset);
+        }
 
-		[HttpPut("{id}")]
-		[Authorize(Roles = "Admin")]
-		public async Task<IActionResult> Update(int id, [FromBody] AssetUpdateDto dto)
-		{
-			var asset = await _db.Assets.FindAsync(id);
-			if (asset == null) return NotFound();
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Update(int id, [FromBody] AssetUpdateDto dto)
+        {
+            var asset = await _db.Assets.FindAsync(id);
+            if (asset == null) return NotFound();
 
-			// Look up Category by Name
-			var category = await _db.Categories
-				.FirstOrDefaultAsync(c => c.Name == dto.CategoryName);
+            var category = await _db.Categories
+                .FirstOrDefaultAsync(c => c.Name == dto.CategoryName);
 
-			if (category == null)
-			{
-				return BadRequest(new { message = $"Category '{dto.CategoryName}' does not exist." });
-			}
+            if (category == null)
+            {
+                return BadRequest(new { message = $"Category '{dto.CategoryName}' does not exist." });
+            }
 
-			// Update core properties
-			asset.Name = dto.Name;
-			asset.ModelNo = dto.ModelNo;
-			asset.CategoryID = category.CategoryID;
-			asset.Tag = dto.Tag;
-			asset.PurchaseDate = dto.PurchaseDate;
-			asset.Cost = dto.Cost;
-			asset.Status = dto.Status;
+            asset.Name = dto.Name;
+            asset.ModelNo = dto.ModelNo;
+            asset.CategoryID = category.CategoryID;
+            asset.Tag = dto.Tag;
+            asset.PurchaseDate = dto.PurchaseDate;
+            asset.Cost = dto.Cost;
+            asset.Status = dto.Status;
 
-			// Update Audit fields
-			asset.UpdatedAt = DateTime.UtcNow;
-			asset.UpdatedBy = GetCurrentUserName(); // Recorded from claims
+            // Audit update
+            asset.UpdatedAt = DateTime.UtcNow;
+            asset.UpdatedBy = GetCurrentUserName();
 
-			await _db.SaveChangesAsync();
-			return NoContent();
-		}
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
 
-		[HttpDelete("{id}")]
-		[Authorize(Roles = "Admin")]
-		public async Task<IActionResult> Delete(int id)
-		{
-			var asset = await _db.Assets.FindAsync(id);
-			if (asset == null) return NotFound();
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var asset = await _db.Assets.FindAsync(id);
+            if (asset == null) return NotFound();
+
+            // Perform Soft Delete
+            asset.Status = AssetManagement.Models.Enums.AssetStatus.Deleted;
+            
+            // Log who deleted it
+            asset.UpdatedAt = DateTime.UtcNow;
+            asset.UpdatedBy = GetCurrentUserName();
+
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
 
         [HttpGet("report")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetReport(DateTime startDate, DateTime endDate)
         {
             var report = await _db.Assets
@@ -156,15 +166,5 @@ namespace AssetManage.Controllers
 
             return Ok(report);
         }
-
     }
-
-			// Log who deleted it
-			asset.UpdatedAt = DateTime.UtcNow;
-			asset.UpdatedBy = GetCurrentUserName();
-
-			await _db.SaveChangesAsync();
-			return NoContent();
-		}
-	}
 }
