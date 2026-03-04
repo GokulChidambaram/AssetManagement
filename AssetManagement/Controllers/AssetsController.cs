@@ -147,8 +147,17 @@ namespace AssetManage.Controllers
 			var asset = await _db.Assets.FindAsync(id);
 			if (asset == null) return NotFound();
 
-			// Perform Soft Delete
-			asset.Status = AssetManagement.Models.Enums.AssetStatus.Deleted;
+        [HttpGet("report")]
+        public async Task<IActionResult> GetReport(DateTime startDate, DateTime endDate)
+        {
+            var report = await _db.Assets
+                .Where(a => a.CreatedAt >= startDate && a.CreatedAt <= endDate)
+                .ToListAsync();
+
+            return Ok(report);
+        }
+
+    }
 
 			// Log who deleted it
 			asset.UpdatedAt = DateTime.UtcNow;
