@@ -23,11 +23,15 @@ namespace AssetManagement.Data
         public DbSet<Issue> Issues => Set<Issue>();
         public DbSet<Report> Reports => Set<Report>();
 
-        public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-		
+        public DbSet<AssetRequest> AssetRequests => Set<AssetRequest>();
 
-		protected override void OnModelCreating(ModelBuilder modelBuilder)
+
+
+
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 

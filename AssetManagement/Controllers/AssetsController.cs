@@ -18,12 +18,27 @@ namespace AssetManage.Controllers
         private string GetCurrentUserName() => User.Identity?.Name ?? "System";
 
         [HttpGet]
-        [Authorize(Roles = "Admin,Manager")]
+        // 1. changed from [Authorize(Roles = "Admin,Manager")]
+        [Authorize]
         public async Task<IActionResult> GetAll()
         {
-            var assets = await _db.Assets
+            // 2. Start building the query (don't fetch from DB yet)
+            var query = _db.Assets
                 .Include(a => a.Category)
                 .Where(a => a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
+                .AsQueryable();
+
+            // 3. ROLE-BASED FILTERING: If the user is an Employee, restrict the data
+            if (User.IsInRole("Employee"))
+            {
+                var currentUserName = GetCurrentUserName(); // Gets 'santosh' from token
+
+                // 👉 IMPORTANT: Change "AssignedTo" to match your actual database column!
+                query = query.Where(a => a.CreatedBy == currentUserName);
+            }
+
+            // 4. Execute the query and map to the DTO
+            var assets = await query
                 .Select(a => new AssetResponseDto(
                     a.AssetID,
                     a.Name,

@@ -9,7 +9,7 @@ namespace AssetManagement.Controllers
 {
 	[ApiController]
 	[Route("api/[controller]")]
-	[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+	//[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
 	public class CategoriesController : ControllerBase
 	{
 		private readonly ApplicationDbContext _db;
@@ -46,7 +46,8 @@ namespace AssetManagement.Controllers
 		}
 
 		[HttpPost]
-		public async Task<IActionResult> Create(CategoryCreateDto dto)
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create(CategoryCreateDto dto)
 		{
 			var currentUserName = GetCurrentUserName();
 
@@ -65,7 +66,8 @@ namespace AssetManagement.Controllers
 		}
 
 		[HttpPut("{id}")]
-		public async Task<IActionResult> Update(int id, CategoryUpdateDto dto)
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Update(int id, CategoryUpdateDto dto)
 		{
 			var c = await _db.Set<Category>().FindAsync(id);
 			if (c == null) return NotFound();
@@ -81,7 +83,8 @@ namespace AssetManagement.Controllers
 		}
 
 		[HttpDelete("{id}")]
-		public async Task<IActionResult> Delete(int id)
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
 		{
 			var c = await _db.Set<Category>().FindAsync(id);
 			if (c == null) return NotFound();
