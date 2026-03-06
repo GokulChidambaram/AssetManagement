@@ -2,6 +2,7 @@ using AssetManagement.Data;
 using AssetManagement.DTOs;
 using AssetManagement.Models.Entities;
 using AssetManagement.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
@@ -50,20 +51,30 @@ namespace AssetManagement.Controllers
 			return Ok(issues);
 		}
 
-		[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Employee,Manager")]
-		[HttpPost]
-		public async Task<IActionResult> Create(IssueCreateDto dto)
-		{
-			// Get the person reporting the issue
-			var user = GetCurrentUserName();
+        [Authorize(Roles = "Employee,Manager")]
+        [HttpPost]
+        public async Task<IActionResult> Create(IssueCreateDto dto)
+        {
+            try
+            {
+                // 1. Extract the actual UserID from the NameIdentifier claim
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
 
-			// Note: Update LogIssueAsync to accept 'user' if you want it tracked via SP
-			await _sp.LogIssueAsync(dto.AssetID, dto.ReportedByUserID, dto.Description ?? string.Empty, dto.RequiresRepair);
+                int actualUserId = int.Parse(userIdClaim);
 
-			return Ok();
-		}
+                // 2. Call the SP using the ID from the TOKEN, not the DTO
+                await _sp.LogIssueAsync(dto.AssetID, actualUserId, dto.Description ?? string.Empty, dto.RequiresRepair);
 
-		[HttpPut("{id}")]
+                return Ok(new { message = "Issue logged successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("{id}")]
 		public async Task<IActionResult> Update(int id, IssueUpdateDto dto)
 		{
 			var issue = await _db.Set<Issue>().FindAsync(id);

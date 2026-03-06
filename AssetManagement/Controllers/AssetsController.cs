@@ -1,6 +1,7 @@
 using AssetManagement.Data;
 using AssetManagement.DTOs;
 using AssetManagement.Models.Entities;
+using AssetManagement.Models.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,26 +19,25 @@ namespace AssetManage.Controllers
         private string GetCurrentUserName() => User.Identity?.Name ?? "System";
 
         [HttpGet]
-        // 1. changed from [Authorize(Roles = "Admin,Manager")]
-        [Authorize]
+        [Authorize] // Allows Admins, Managers, and Employees
         public async Task<IActionResult> GetAll()
         {
-            // 2. Start building the query (don't fetch from DB yet)
             var query = _db.Assets
                 .Include(a => a.Category)
-                .Where(a => a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
+                .Where(a => a.Status != AssetStatus.Deleted)
                 .AsQueryable();
 
-            // 3. ROLE-BASED FILTERING: If the user is an Employee, restrict the data
+            // ROLE-BASED FILTERING: Employees only see their Active assigned assets
             if (User.IsInRole("Employee"))
             {
-                var currentUserName = GetCurrentUserName(); // Gets 'santosh' from token
+                var currentUserName = GetCurrentUserName();
 
-                // 👉 IMPORTANT: Change "AssignedTo" to match your actual database column!
-                query = query.Where(a => a.CreatedBy == currentUserName);
+                query = query.Where(asset => _db.Set<Assignment>().Any(assign =>
+                    assign.AssetID == asset.AssetID &&
+                    assign.AssignedToUser!.Name == currentUserName && // Change .Name to .Email if your Identity uses Email
+                    assign.Status == AssignmentStatus.Active));
             }
 
-            // 4. Execute the query and map to the DTO
             var assets = await query
                 .Select(a => new AssetResponseDto(
                     a.AssetID,
@@ -64,7 +64,7 @@ namespace AssetManage.Controllers
         {
             var asset = await _db.Assets
                 .Include(a => a.Category)
-                .Where(a => a.AssetID == id && a.Status != AssetManagement.Models.Enums.AssetStatus.Deleted)
+                .Where(a => a.AssetID == id && a.Status != AssetStatus.Deleted)
                 .Select(a => new AssetResponseDto(
                     a.AssetID,
                     a.Name,
@@ -84,6 +84,19 @@ namespace AssetManage.Controllers
             return asset == null ? NotFound() : Ok(asset);
         }
 
+        // NEW: For the Manager's "Approve & Assign" Modal
+        [HttpGet("available/{categoryId}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> GetAvailableByCategory(int categoryId)
+        {
+            var assets = await _db.Assets
+                .Where(a => a.CategoryID == categoryId && a.Status == AssetStatus.Available)
+                .Select(a => new { a.AssetID, a.Name, a.Tag })
+                .ToListAsync();
+
+            return Ok(assets);
+        }
+
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(AssetCreateDto dto)
@@ -101,7 +114,7 @@ namespace AssetManage.Controllers
                 Tag = dto.Tag,
                 PurchaseDate = dto.PurchaseDate,
                 Cost = dto.Cost,
-                Status = AssetManagement.Models.Enums.AssetStatus.Available,
+                Status = AssetStatus.Available,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 CreatedBy = currentUser,
@@ -146,7 +159,7 @@ namespace AssetManage.Controllers
             var asset = await _db.Assets.FindAsync(id);
             if (asset == null) return NotFound();
 
-            asset.Status = AssetManagement.Models.Enums.AssetStatus.Deleted;
+            asset.Status = AssetStatus.Deleted;
             asset.UpdatedAt = DateTime.UtcNow;
             asset.UpdatedBy = GetCurrentUserName();
 
@@ -155,6 +168,7 @@ namespace AssetManage.Controllers
         }
 
         [HttpGet("report")]
+        [Authorize(Roles = "Admin,Manager")]
         public async Task<IActionResult> GetReport(DateTime startDate, DateTime endDate)
         {
             var finalEnd = endDate.Date.AddDays(1).AddTicks(-1);

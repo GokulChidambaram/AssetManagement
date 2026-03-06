@@ -1,8 +1,9 @@
 using AssetManagement.Models.Entities;
 using AssetManagement.Models.Enums;
+using AssetManagement.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using AssetManagement.Services;
+using System.Text.Json;
 
 namespace AssetManagement.Data
 {
@@ -28,7 +29,49 @@ namespace AssetManagement.Data
         public DbSet<AssetRequest> AssetRequests => Set<AssetRequest>();
 
 
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Capture entries BEFORE saving
+            var auditEntries = OnBeforeSaveChanges();
 
+            var result = await base.SaveChangesAsync(cancellationToken);
+
+            // Save the audit logs AFTER the main changes succeed
+            if (auditEntries.Any())
+            {
+                AuditLogs.AddRange(auditEntries);
+                await base.SaveChangesAsync(cancellationToken);
+            }
+
+            return result;
+        }
+
+        private List<AuditLog> OnBeforeSaveChanges()
+        {
+            ChangeTracker.DetectChanges();
+            var auditEntries = new List<AuditLog>();
+
+            foreach (var entry in ChangeTracker.Entries())
+            {
+                // Skip auditing the AuditLog table itself to avoid infinite loops
+                if (entry.Entity is AuditLog || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
+                    continue;
+
+                var audit = new AuditLog
+                {
+                    Action = entry.State.ToString().ToUpper(),
+                    EntityName = entry.Entity.GetType().Name,
+                    EntityID = entry.Properties.FirstOrDefault(p => p.Metadata.IsPrimaryKey())?.CurrentValue?.ToString(),
+                    CreatedAt = DateTime.UtcNow,
+                    OldValues = entry.State == EntityState.Added ? null :
+                        JsonSerializer.Serialize(entry.Properties.ToDictionary(p => p.Metadata.Name, p => p.OriginalValue)),
+                    NewValues = entry.State == EntityState.Deleted ? null :
+                        JsonSerializer.Serialize(entry.Properties.ToDictionary(p => p.Metadata.Name, p => p.CurrentValue))
+                };
+                auditEntries.Add(audit);
+            }
+            return auditEntries;
+        }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

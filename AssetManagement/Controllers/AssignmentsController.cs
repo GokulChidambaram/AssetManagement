@@ -1,90 +1,132 @@
+using AssetManagement.Data;
 using AssetManagement.DTOs;
+using AssetManagement.Models.Entities;
+using AssetManagement.Models.Enums;
 using AssetManagement.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace AssetManagement.Controllers
 {
-	[ApiController]
-	[Route("api/[controller]")]
-	public class AssignmentsController : ControllerBase
-	{
-		private readonly ISpService _spService;
-		private readonly AssetManagement.Data.ApplicationDbContext _db;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AssignmentsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _db;
+        private readonly ISpService _spService;
 
-		public AssignmentsController(ISpService spService, AssetManagement.Data.ApplicationDbContext db)
-		{
-			_spService = spService;
-			_db = db;
-		}
+        public AssignmentsController(ApplicationDbContext db, ISpService spService)
+        {
+            _db = db;
+            _spService = spService;
+        }
 
-		// Helper to extract Name from Claims
-		private string GetCurrentUserName() => User.Identity?.Name ?? "System";
+        // Helper to extract Name from JWT Claims
+        private string GetCurrentUserName() => User.Identity?.Name ?? "System";
 
-		[HttpGet]
-		public async Task<IActionResult> GetAll()
-		{
-			var a = await _db.Assignments
-				.Include(a => a.Asset)
-				.Include(a => a.AssignedToUser)
-				.Select(a => new AssignmentResponseDto(
-					a.AssignmentID,
-					a.AssetID,
-					a.Asset.Name,
-					a.AssignedToUserID,
-					a.AssignedToUser.Name,
-					a.AssignedDate,
-					a.ReturnDate,
-					a.Status,
-					a.Location,
-					a.CreatedAt, // Ensure these are in your DTO
-					a.UpdatedAt,
-					a.CreatedBy,
-					a.UpdatedBy
-				)).ToListAsync();
+        [HttpGet]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> GetAll()
+        {
+            var assignments = await _db.Set<Assignment>()
+                .Include(a => a.Asset)
+                .Include(a => a.AssignedToUser)
+                .Select(a => new AssignmentResponseDto(
+                    a.AssignmentID,
+                    a.AssetID,
+                    a.Asset!.Name,
+                    a.AssignedToUserID,
+                    a.AssignedToUser!.Name,
+                    a.AssignedDate,
+                    a.ReturnDate,
+                    a.Status,
+                    a.Location,
+                    a.CreatedAt,
+                    a.UpdatedAt,
+                    a.CreatedBy,
+                    a.UpdatedBy
+                )).ToListAsync();
 
-			return Ok(a);
-		}
+            return Ok(assignments);
+        }
 
-		[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Manager")]
-		[HttpPost("assign")]
-		public async Task<IActionResult> Assign(AssignAssetDto dto)
-		{
-			// Note: If you want to track WHO assigned this, you should update 
-			// your SpService.AssignAssetAsync method to accept 'currentUserName' as a parameter.
-			var currentUserName = GetCurrentUserName();
+        [HttpGet("{id}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var a = await _db.Set<Assignment>()
+                .Include(a => a.Asset)
+                .Include(a => a.AssignedToUser)
+                .FirstOrDefaultAsync(x => x.AssignmentID == id);
 
-			await _spService.AssignAssetAsync(dto.AssetID, dto.AssignedToUserID, dto.AssignedDate, dto.Location ?? string.Empty);
+            if (a == null) return NotFound();
 
-			return Ok();
-		}
+            return Ok(new AssignmentResponseDto(
+                a.AssignmentID, a.AssetID, a.Asset!.Name,
+                a.AssignedToUserID, a.AssignedToUser!.Name,
+                a.AssignedDate, a.ReturnDate, a.Status, a.Location,
+                a.CreatedAt, a.UpdatedAt, a.CreatedBy, a.UpdatedBy
+            ));
+        }
 
-		[Microsoft.AspNetCore.Authorization.Authorize(Roles = "Manager")]
-		[HttpPost("return")]
-		public async Task<IActionResult> Return(ReturnAssetDto dto)
-		{
-			// Similarly, update SpService.ReturnAssetAsync to accept 'currentUserName'
-			await _spService.ReturnAssetAsync(dto.AssignmentID, dto.ReturnDate);
+        [HttpPost("assign")]
+        [Authorize(Roles = "Manager,Admin")]
+        public async Task<IActionResult> Assign(AssignAssetDto dto)
+        {
+            try
+            {
+                // 🔥 Calls your sp_AssignAsset through the service
+                // Note: Ensure your ISpService implementation passes GetCurrentUserName() 
+                // to the SP if you updated it to include CreatedBy.
+                await _spService.AssignAssetAsync(
+                    dto.AssetID,
+                    dto.AssignedToUserID,
+                    dto.AssignedDate,
+                    dto.Location ?? "Office"
+                );
 
-			return Ok();
-		}
+                return Ok(new { message = "Asset assigned successfully via Stored Procedure." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
 
-		[HttpPut("{id}")]
-		public async Task<IActionResult> Update(int id, UpdateAssignmentDto dto)
-		{
-			var a = await _db.Set<AssetManagement.Models.Entities.Assignment>().FindAsync(id);
-			if (a == null) return NotFound();
+        [HttpPost("return")]
+        [Authorize(Roles = "Manager,Admin")]
+        public async Task<IActionResult> Return(ReturnAssetDto dto)
+        {
+            try
+            {
+                // 🔥 Calls your sp_ReturnAsset through the service
+                await _spService.ReturnAssetAsync(dto.AssignmentID, dto.ReturnDate);
+                return Ok(new { message = "Asset returned successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
 
-			a.Status = dto.Status;
-			a.Location = dto.Location;
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> Update(int id, UpdateAssignmentDto dto)
+        {
+            var a = await _db.Set<Assignment>().FindAsync(id);
+            if (a == null) return NotFound();
 
-			// Manual Audit Fields
-			a.UpdatedAt = DateTime.UtcNow;
-			a.UpdatedBy = GetCurrentUserName();
+            // Only update fields allowed for manual editing
+            a.Status = dto.Status;
+            a.Location = dto.Location;
 
-			await _db.SaveChangesAsync();
-			return NoContent();
-		}
-	}
+            // Manual Audit Fields
+            a.UpdatedAt = DateTime.UtcNow;
+            a.UpdatedBy = GetCurrentUserName();
+
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
+    }
 }

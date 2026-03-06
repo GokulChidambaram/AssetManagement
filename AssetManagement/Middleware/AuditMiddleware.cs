@@ -1,57 +1,64 @@
 ﻿using AssetManagement.Data;
 using AssetManagement.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace AssetManagement.Middleware
 {
     public class AuditMiddleware
     {
         private readonly RequestDelegate _next;
-        public AuditMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
+
+        public AuditMiddleware(RequestDelegate next) => _next = next;
+
         public async Task Invoke(HttpContext context, ApplicationDbContext db)
         {
-            var user = context.User;
-            var userId = user?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var userName = user?.Identity?.Name;
-            var role = user?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            // 1. Capture user and request metadata
+            var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userName = context.User.Identity?.Name;
+            var role = context.User.FindFirst(ClaimTypes.Role)?.Value;
             var endpoint = context.Request.Path;
             var method = context.Request.Method;
             var ip = context.Connection.RemoteIpAddress?.ToString();
-            // Capture changes AFTER request executes
+
+            // 2. Execute the request
             await _next(context);
-            var entries = db.ChangeTracker.Entries()
-                .Where(e =>
-                    e.State == EntityState.Added ||
-                    e.State == EntityState.Modified ||
-                    e.State == EntityState.Deleted);
-            foreach (var entry in entries)
+
+            // 3. LOGIC FOR "GET" REQUESTS (READS)
+            if (method == "GET")
             {
-                var audit = new AuditLog
+                var readLog = new AuditLog
                 {
-                    UserID = string.IsNullOrEmpty(userId) ? null : int.Parse(userId),
+                    UserID = int.TryParse(userId, out int id) ? id : null,
                     UserName = userName,
                     Role = role,
-                    Action = entry.State.ToString().ToUpper(),
-                    EntityName = entry.Entity.GetType().Name,
-                    EntityID = entry.Properties
-                                    .FirstOrDefault(p => p.Metadata.IsPrimaryKey())?
-                                    .CurrentValue?.ToString(),
-                    HttpMethod = method,
+                    Action = "READ",
+                    EntityName = "System", // Or parse path to determine entity
                     Endpoint = endpoint,
+                    HttpMethod = method,
                     IPAddress = ip,
-                    OldValues = entry.State == EntityState.Added ? null :
-                                System.Text.Json.JsonSerializer.Serialize(
-                                    entry.Properties.ToDictionary(p => p.Metadata.Name, p => p.OriginalValue)),
-                    NewValues = entry.State == EntityState.Deleted ? null :
-                                System.Text.Json.JsonSerializer.Serialize(
-                                    entry.Properties.ToDictionary(p => p.Metadata.Name, p => p.CurrentValue)),
                     CreatedAt = DateTime.UtcNow
                 };
-                db.AuditLogs.Add(audit);
+                db.AuditLogs.Add(readLog);
+                await db.SaveChangesAsync();
+                return;
             }
+
+            // 4. LOGIC FOR "POST/PUT/DELETE" (Enriching DB Changes)
+            var latestMutationLogs = db.ChangeTracker.Entries<AuditLog>()
+                .Where(e => e.State == EntityState.Added)
+                .Select(e => e.Entity);
+
+            foreach (var log in latestMutationLogs)
+            {
+                log.UserID = int.TryParse(userId, out int id) ? id : null;
+                log.UserName = userName;
+                log.Role = role;
+                log.HttpMethod = method;
+                log.Endpoint = endpoint;
+                log.IPAddress = ip;
+            }
+
             await db.SaveChangesAsync();
         }
     }
