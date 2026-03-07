@@ -24,8 +24,8 @@ namespace AssetManagement.Controllers
 
 		// Helper to extract the logged-in user's name from JWT claims
 		private string GetCurrentUserName() => User.Identity?.Name ?? "System";
-
-		[HttpGet]
+        [Authorize(Roles = "Manager")]
+        [HttpGet]
 		public async Task<IActionResult> GetAll()
 		{
 			var issues = await _db.Set<Issue>()
@@ -50,7 +50,47 @@ namespace AssetManagement.Controllers
 
 			return Ok(issues);
 		}
+        [Authorize(Roles = "Employee")]
+        [HttpGet("my-issues")]
+        public async Task<IActionResult> GetMyIssues()
+        {
+            try
+            {
+                // Extract UserID from the JWT Token (same logic as your Create method)
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
 
+                int currentUserId = int.Parse(userIdClaim);
+
+                var issues = await _db.Set<Issue>()
+                    .Include(i => i.Asset)
+                    .Include(i => i.ReportedBy)
+                    // THE KEY FIX: Filter by the logged-in user's ID
+                    .Where(i => i.ReportedByUserID == currentUserId)
+                    .Where(i => i.Status != AssetManagement.Models.Enums.IssueStatus.Closed)
+                    .Select(i => new IssueResponseDto(
+                        i.IssueID,
+                        i.AssetID,
+                        i.Asset!.Name,
+                        i.ReportedByUserID,
+                        i.ReportedBy.Name,
+                        i.Description,
+                        i.ReportedDate,
+                        i.Status,
+                        i.CreatedAt,
+                        i.UpdatedAt,
+                        i.CreatedBy,
+                        i.UpdatedBy
+                    ))
+                    .ToListAsync();
+
+                return Ok(issues);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
         [Authorize(Roles = "Employee,Manager")]
         [HttpPost]
         public async Task<IActionResult> Create(IssueCreateDto dto)
