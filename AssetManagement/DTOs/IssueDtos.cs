@@ -11,6 +11,8 @@ namespace AssetManagement.DTOs
     public record IssueUpdateDto(
         string? Description, 
         IssueStatus Status);
+
+    public record IssueStatusUpdateDto(int Status, string? Description);
     public record IssueResponseDto(
         int IssueID, 
         int AssetID,

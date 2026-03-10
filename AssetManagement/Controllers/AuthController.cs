@@ -25,8 +25,8 @@ namespace AssetManagement.Controllers
 			_passwordHasher = passwordHasher;
 			_config = config;
 		}
-
-		[HttpPost("register")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")]
+        [HttpPost("register")]
 		public async Task<IActionResult> Register(UserRegisterDto dto)
 		{
 			// 1. Check if user already exists
