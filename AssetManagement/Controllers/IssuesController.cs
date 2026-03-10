@@ -1,6 +1,7 @@
 using AssetManagement.Data;
 using AssetManagement.DTOs;
 using AssetManagement.Models.Entities;
+using AssetManagement.Models.Enums;
 using AssetManagement.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -131,7 +132,45 @@ namespace AssetManagement.Controllers
 			return NoContent();
 		}
 
-		[HttpDelete("{id}")]
+        [HttpPatch("{id}/status")]
+        [Authorize(Roles = "Employee,Manager")] // Allow the person fixing it to update the status
+        public async Task<IActionResult> UpdateStatusOnly(int id, [FromBody] IssueStatusUpdateDto dto)
+        {
+            // 1. Find the Issue
+            var issue = await _db.Set<Issue>().FindAsync(id);
+            if (issue == null) return NotFound(new { message = "Issue not found." });
+
+            // 2. Update the Issue Status using your Enum
+            issue.Status = (IssueStatus)dto.Status;
+            issue.UpdatedAt = DateTime.UtcNow;
+            issue.UpdatedBy = GetCurrentUserName();
+
+            // 3. The State Machine Logic: If the issue is now Resolved (Assuming 2 = Resolved)
+            // Note: Cast dto.Status to your IssueStatus enum to check it
+            if ((IssueStatus)dto.Status == IssueStatus.Resolved)
+            {
+                var asset = await _db.Set<Asset>().FindAsync(issue.AssetID);
+                if (asset != null)
+                {
+                    // Check if there is an active assignment for this asset
+                    bool hasActiveAssignment = await _db.Set<Assignment>()
+                        .AnyAsync(a => a.AssetID == asset.AssetID && a.Status == AssignmentStatus.Active);
+
+                    // Flip the asset status based on the assignment check
+                    asset.Status = hasActiveAssignment ? AssetStatus.Assigned : AssetStatus.Available;
+
+                    asset.UpdatedAt = DateTime.UtcNow;
+                    asset.UpdatedBy = GetCurrentUserName();
+                }
+            }
+
+            // 4. Save all changes (Issue update and Asset update) in one transaction
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Issue status updated and Asset routed correctly." });
+        }
+
+        [HttpDelete("{id}")]
 		public async Task<IActionResult> Delete(int id)
 		{
 			var issue = await _db.Set<Issue>().FindAsync(id);
